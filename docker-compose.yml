@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    image: attitude-service:latest
+    ports:
+      # Host-side port is configurable via HOST_PORT (default 8080).
+      - "${HOST_PORT:-8080}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 3s
+    restart: unless-stopped
+
+  verify:
+    image: attitude-service:latest
+    build: .
+    # Runs once, after the web service is healthy, then exits. Its exit code
+    # aggregates: build (byte-compile), pytest suite, interpolation smoke and
+    # over-long-gap rejection smoke.
+    command: ["python", "scripts/verify.py"]
+    environment:
+      BASE_URL: http://web:8000
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: "no"
